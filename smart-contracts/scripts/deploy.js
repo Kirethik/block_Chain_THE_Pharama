@@ -1,57 +1,92 @@
 const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
-  console.log("🚀 Starting deployment...\n");
-
-  const [deployer] = await hre.ethers.getSigners();
+  console.log("Starting deployment...");
   
-  console.log("Deploying contracts with account:", deployer.address);
-  console.log("Account balance:", hre.ethers.formatEther(await hre.ethers.provider.getBalance(deployer.address)), "ETH\n");
-
-  // Deploy SupplyChain contract
-  console.log("📦 Deploying SupplyChain contract...");
-  const SupplyChain = await hre.ethers.getContractFactory("SupplyChain");
-  const supplyChain = await SupplyChain.deploy(deployer.address);
+  // Get the network we're deploying to
+  const network = hre.network.name;
+  console.log(`Deploying to network: ${network}`);
+  
+  // Get deployer account
+  const [deployer] = await hre.ethers.getSigners();
+  console.log(`Deploying contracts with account: ${deployer.address}`);
+  
+  // Check balance
+  const balance = await hre.ethers.provider.getBalance(deployer.address);
+  console.log(`Account balance: ${hre.ethers.formatEther(balance)} ETH`);
+  
+  // Deploy the contract
+  console.log("\nDeploying PharmaceuticalSupplyChain contract...");
+  const PharmaceuticalSupplyChain = await hre.ethers.getContractFactory("PharmaceuticalSupplyChain");
+  const supplyChain = await PharmaceuticalSupplyChain.deploy();
   
   await supplyChain.waitForDeployment();
   const contractAddress = await supplyChain.getAddress();
   
-  console.log("✅ SupplyChain deployed to:", contractAddress);
-  console.log("   Admin:", deployer.address);
-  console.log("   Network:", hre.network.name);
-  console.log("   Chain ID:", (await hre.ethers.provider.getNetwork()).chainId.toString());
-
-  // Grant initial roles (optional)
-  if (process.env.INITIAL_MANUFACTURER) {
-    console.log("\n🔑 Granting initial roles...");
-    const tx = await supplyChain.grantManufacturer(process.env.INITIAL_MANUFACTURER);
-    await tx.wait();
-    console.log("✓ Manufacturer role granted to:", process.env.INITIAL_MANUFACTURER);
-  }
-
-  // Verification info
-  console.log("\n📝 Verification command:");
-  console.log(`npx hardhat verify --network ${hre.network.name} ${contractAddress} ${deployer.address}`);
-
-  // Save deployment info
-  const fs = require('fs');
+  console.log(`PharmaceuticalSupplyChain deployed to: ${contractAddress}`);
+  
+  // Save deployment information
   const deploymentInfo = {
-    network: hre.network.name,
+    network: network,
     contractAddress: contractAddress,
     deployer: deployer.address,
-    timestamp: new Date().toISOString(),
-    chainId: (await hre.ethers.provider.getNetwork()).chainId.toString()
+    deploymentTime: new Date().toISOString(),
+    blockNumber: await hre.ethers.provider.getBlockNumber()
   };
-
-  fs.writeFileSync(
-    `./deployments/${hre.network.name}.json`,
-    JSON.stringify(deploymentInfo, null, 2)
-  );
   
-  console.log("\n✅ Deployment info saved to deployments/", hre.network.name + ".json");
-  console.log("\n🎉 Deployment completed successfully!");
+  // Create deployments directory if it doesn't exist
+  const deploymentsDir = path.join(__dirname, "../deployments");
+  if (!fs.existsSync(deploymentsDir)) {
+    fs.mkdirSync(deploymentsDir, { recursive: true });
+  }
+  
+  // Save deployment info to file
+  const deploymentFile = path.join(deploymentsDir, `${network}_deployment.json`);
+  fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
+  console.log(`\nDeployment info saved to: ${deploymentFile}`);
+  
+  // Wait for block confirmations on non-local networks
+  if (network !== "hardhat" && network !== "localhost") {
+    console.log("\nWaiting for block confirmations...");
+    await supplyChain.deploymentTransaction().wait(6);
+    console.log("Block confirmations received!");
+    
+    // Verify contract on Etherscan/Polygonscan
+    if (network === "mainnet" || network === "sepolia" || network === "polygon" || network === "mumbai") {
+      console.log("\nVerifying contract on block explorer...");
+      try {
+        await hre.run("verify:verify", {
+          address: contractAddress,
+          constructorArguments: []
+        });
+        console.log("Contract verified successfully!");
+      } catch (error) {
+        console.log("Verification error:", error.message);
+      }
+    }
+  }
+  
+  // Display contract interaction instructions
+  console.log("\n=== Deployment Summary ===");
+  console.log(`Network: ${network}`);
+  console.log(`Contract Address: ${contractAddress}`);
+  console.log(`Transaction Hash: ${supplyChain.deploymentTransaction().hash}`);
+  console.log("\n=== Next Steps ===");
+  console.log("1. Update your .env file with the contract address");
+  console.log("2. Update the MySQL database with contract information");
+  console.log("3. Configure the backend API to use this contract address");
+  console.log("4. Authorize manufacturers using: authorizeManufacturer(address)");
+  
+  return {
+    contractAddress,
+    deployer: deployer.address,
+    network
+  };
 }
 
+// Execute deployment
 main()
   .then(() => process.exit(0))
   .catch((error) => {

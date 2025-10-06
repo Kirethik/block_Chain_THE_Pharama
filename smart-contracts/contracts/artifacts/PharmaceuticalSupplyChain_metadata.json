@@ -1,0 +1,455 @@
+{
+	"compiler": {
+		"version": "0.8.30+commit.73712a01"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "manufacturer",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "ManufacturerAuthorized",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "manufacturer",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "ManufacturerRevoked",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "bytes32",
+						"name": "serialNumberHash",
+						"type": "bytes32"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "manufacturer",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "ProductRegistered",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "bytes32",
+						"name": "transactionHash",
+						"type": "bytes32"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "TransactionCompleted",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "bytes32",
+						"name": "transactionHash",
+						"type": "bytes32"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "shipper",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "receiver",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "TransactionCreated",
+				"type": "event"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_manufacturer",
+						"type": "address"
+					}
+				],
+				"name": "authorizeManufacturer",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "authorizedManufacturers",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "_transactionHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "_serialNumberHash",
+						"type": "bytes32"
+					}
+				],
+				"name": "completeTransaction",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "contractOwner",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "_serialNumberHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "_encryptedProductId",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "_encryptedSerialNumber",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "_encryptedShipperId",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "_encryptedReceiverId",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "address",
+						"name": "_receiverAddress",
+						"type": "address"
+					}
+				],
+				"name": "createTransaction",
+				"outputs": [
+					{
+						"internalType": "bytes32",
+						"name": "",
+						"type": "bytes32"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "_serialNumberHash",
+						"type": "bytes32"
+					}
+				],
+				"name": "getCurrentOwner",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "_transactionHash",
+						"type": "bytes32"
+					}
+				],
+				"name": "getTransaction",
+				"outputs": [
+					{
+						"internalType": "bytes32",
+						"name": "encryptedProductId",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "encryptedSerialNumber",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "encryptedShipperId",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "encryptedReceiverId",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "isCompleted",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_user",
+						"type": "address"
+					}
+				],
+				"name": "getUserTransactions",
+				"outputs": [
+					{
+						"internalType": "bytes32[]",
+						"name": "",
+						"type": "bytes32[]"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "_serialNumberHash",
+						"type": "bytes32"
+					}
+				],
+				"name": "isRegistered",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "_serialNumberHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "_encryptedProductId",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "_encryptedSerialNumber",
+						"type": "bytes32"
+					}
+				],
+				"name": "registerProduct",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_manufacturer",
+						"type": "address"
+					}
+				],
+				"name": "revokeManufacturer",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"details": "Manages pharmaceutical product transactions with privacy and ownership validation",
+			"kind": "dev",
+			"methods": {
+				"authorizeManufacturer(address)": {
+					"details": "Authorize a manufacturer to register initial products"
+				},
+				"completeTransaction(bytes32,bytes32)": {
+					"details": "Complete transaction and transfer ownership",
+					"params": {
+						"_serialNumberHash": "Hash of the serial number",
+						"_transactionHash": "Hash of the transaction"
+					}
+				},
+				"createTransaction(bytes32,bytes32,bytes32,bytes32,bytes32,address)": {
+					"details": "Create a new transaction to transfer product ownership",
+					"params": {
+						"_encryptedProductId": "Encrypted product ID (only shipper/receiver can decrypt)",
+						"_encryptedReceiverId": "Encrypted receiver ID",
+						"_encryptedSerialNumber": "Encrypted serial number",
+						"_encryptedShipperId": "Encrypted shipper ID",
+						"_receiverAddress": "Blockchain address of receiver",
+						"_serialNumberHash": "Hash of the serial number"
+					}
+				},
+				"getCurrentOwner(bytes32)": {
+					"details": "Check current owner of a product"
+				},
+				"getTransaction(bytes32)": {
+					"details": "Get transaction details (only shipper or receiver can access)"
+				},
+				"getUserTransactions(address)": {
+					"details": "Get user's transaction hashes"
+				},
+				"isRegistered(bytes32)": {
+					"details": "Check if product is registered"
+				},
+				"registerProduct(bytes32,bytes32,bytes32)": {
+					"details": "Register initial product by manufacturer",
+					"params": {
+						"_encryptedProductId": "Encrypted product ID",
+						"_encryptedSerialNumber": "Encrypted serial number",
+						"_serialNumberHash": "Hash of the serial number for privacy"
+					}
+				},
+				"revokeManufacturer(address)": {
+					"details": "Revoke manufacturer authorization"
+				}
+			},
+			"title": "PharmaceuticalSupplyChain",
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"SupplyChain.sol": "PharmaceuticalSupplyChain"
+		},
+		"evmVersion": "prague",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"SupplyChain.sol": {
+			"keccak256": "0x7ec2ad710c5a4b5d62af6ba62ac9befc3866070708122326a688c948be099e81",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://defdb8c9e39ea4106ff8f88f2ca84751aa5f2668a747059cd41446fb7b454b25",
+				"dweb:/ipfs/QmTTfXbMwrdxdAP4kX7wykJ21hcy22Fpyu5JJnvWjzeC7Q"
+			]
+		}
+	},
+	"version": 1
+}

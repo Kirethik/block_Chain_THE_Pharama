@@ -224,6 +224,42 @@
       "artifacts": [
         "IERC165"
       ]
+    },
+    "D:\\Git Hub\\block_Chain_THE_Pharama\\smart-contracts\\contracts\\SupplyChain.sol": {
+      "lastModificationDate": 1759759242820,
+      "contentHash": "6254daed19dd6042e6391e7775413489",
+      "sourceName": "contracts/SupplyChain.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "PharmaceuticalSupplyChain"
+      ]
     }
   }
 }

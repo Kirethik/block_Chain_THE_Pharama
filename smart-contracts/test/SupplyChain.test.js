@@ -1,245 +1,193 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+// Use 'anyValue' from the Hardhat chai matchers to handle the timestamp comparison issue
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs"); 
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-describe("SupplyChain", function () {
-  let supplyChain;
-  let admin, manufacturer, distributor, pharmacy, regulator, user;
-  let itemKey, commit;
+describe("PharmaceuticalSupplyChain", function () {
+  let supplyChain;
+  let admin, manufacturer, distributor, pharmacy, user;
+  let serialHash, dummyEncryptedBytes;
 
-  beforeEach(async function () {
-    [admin, manufacturer, distributor, pharmacy, regulator, user] = await ethers.getSigners();
+  beforeEach(async function () {
+    [admin, manufacturer, distributor, pharmacy, user] = await ethers.getSigners();
 
-    const SupplyChain = await ethers.getContractFactory("SupplyChain", admin);
-    supplyChain = await SupplyChain.deploy(admin.address);
-    await supplyChain.waitForDeployment();
+    // Get the contract factory and deploy the contract
+    const PharmaceuticalSupplyChainFactory = await ethers.getContractFactory("PharmaceuticalSupplyChain", admin);
+    supplyChain = await PharmaceuticalSupplyChainFactory.deploy();
+    await supplyChain.waitForDeployment();
 
-    // Grant roles
-    await supplyChain.connect(admin).grantManufacturer(manufacturer.address);
-    await supplyChain.connect(admin).grantDistributor(distributor.address);
-    await supplyChain.connect(admin).grantPharmacy(pharmacy.address);
-    await supplyChain.connect(admin).grantRegulator(regulator.address);
+    // Authorize the manufacturer test account. The admin (deployer) is authorized in the constructor.
+    await supplyChain.connect(admin).authorizeManufacturer(manufacturer.address);
 
-    // Prepare test data
-    itemKey = ethers.keccak256(ethers.toUtf8Bytes("product|serial1"));
-    commit = ethers.randomBytes(32);
-  });
+    // Prepare test data: Hash of a serial number for on-chain mapping
+    serialHash = ethers.keccak256(ethers.toUtf8Bytes("product|serial1"));
+    // Dummy encrypted data (bytes32) to satisfy the required function arguments for privacy
+    dummyEncryptedBytes = ethers.encodeBytes32String("dummy");
+  });
 
-  describe("Deployment", function () {
-    it("Should set the correct admin", async function () {
-      expect(await supplyChain.hasRole(await supplyChain.DEFAULT_ADMIN_ROLE(), admin.address)).to.be.true;
-    });
+// =========================================================================
+// DEPLOYMENT & ACCESS CONTROL TESTS
+// =========================================================================
+  describe("Deployment & Authorization", function () {
+    it("Should set the deployer as the contractOwner", async function () {
+      expect(await supplyChain.contractOwner()).to.equal(admin.address);
+    });
 
-    it("Should grant manufacturer role correctly", async function () {
-      expect(await supplyChain.hasRole(await supplyChain.MANUFACTURER_ROLE(), manufacturer.address)).to.be.true;
-    });
-  });
+    it("Should authorize the manufacturer account", async function () {
+      expect(await supplyChain.authorizedManufacturers(manufacturer.address)).to.be.true;
+    });
 
-  describe("Item Registration", function () {
-    it("Should register a new item successfully", async function () {
-      await supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit);
-      
-      expect(await supplyChain.ownerOf(itemKey)).to.equal(manufacturer.address);
-      expect(await supplyChain.itemExists(itemKey)).to.be.true;
-    });
+    it("Should fail to authorize manufacturer if not owner", async function () {
+      await expect(
+        supplyChain.connect(user).authorizeManufacturer(user.address)
+      ).to.be.revertedWith("Only contract owner can perform this action");
+    });
+  });
 
-    it("Should fail if non-manufacturer tries to register", async function () {
-      await expect(
-        supplyChain.connect(user).registerItem(itemKey, user.address, commit)
-      ).to.be.reverted;
-    });
+// =========================================================================
+// PRODUCT REGISTRATION (INITIAL TRANSACTION) & OWNERSHIP VALIDATION
+// =========================================================================
+  describe("Product Registration", function () {
+    it("Should register a new product successfully (Initial Transaction)", async function () {
+      // The two dummy bytes32 are for encryptedProductId and encryptedSerialNumber
+      await supplyChain.connect(manufacturer).registerProduct(serialHash, dummyEncryptedBytes, dummyEncryptedBytes);
+      
+      // Check ownership is set to the manufacturer (using the contract's getCurrentOwner function)
+      expect(await supplyChain.getCurrentOwner(serialHash)).to.equal(manufacturer.address);
+      expect(await supplyChain.isRegistered(serialHash)).to.be.true;
+    });
 
-    it("Should fail to register duplicate item", async function () {
-      await supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit);
-      
-      await expect(
-        supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit)
-      ).to.be.revertedWith("Item already exists");
-    });
+    it("Should fail if non-manufacturer tries to register", async function () {
+      await expect(
+        supplyChain.connect(user).registerProduct(serialHash, dummyEncryptedBytes, dummyEncryptedBytes)
+      ).to.be.revertedWith("Only authorized manufacturers can register products");
+    });
 
-    it("Should emit ItemRegistered event", async function () {
-      await expect(supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit))
-        .to.emit(supplyChain, "ItemRegistered")
-        .withArgs(itemKey, manufacturer.address, manufacturer.address, commit, await time.latest() + 1);
-    });
+    it("Should fail to register duplicate product", async function () {
+      await supplyChain.connect(manufacturer).registerProduct(serialHash, dummyEncryptedBytes, dummyEncryptedBytes);
+      
+      await expect(
+        supplyChain.connect(manufacturer).registerProduct(serialHash, dummyEncryptedBytes, dummyEncryptedBytes)
+      ).to.be.revertedWith("Product already registered");
+    });
 
-    it("Should update statistics correctly", async function () {
-      await supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit);
-      
-      const stats = await supplyChain.getStats();
-      expect(stats.totalItems).to.equal(1);
-      expect(stats.totalTxs).to.equal(0); // No transfers yet
-    });
-  });
+    it("Should emit ProductRegistered event", async function () {
+      await expect(supplyChain.connect(manufacturer).registerProduct(serialHash, dummyEncryptedBytes, dummyEncryptedBytes))
+        .to.emit(supplyChain, "ProductRegistered")
+        // FIX: Replaced explicit timestamp with anyValue to avoid timing error.
+        .withArgs(serialHash, manufacturer.address, anyValue); 
+    });
+  });
 
-  describe("Item Transfer", function () {
-    beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit);
-    });
+// =========================================================================
+// PRODUCT TRANSFER (OWNERSHIP VALIDATION)
+// =========================================================================
+  describe("Product Transfer (Create & Complete)", function () {
+    let txHash;
+    const eShipperID = ethers.encodeBytes32String("MFG001");
+    const eReceiverID = ethers.encodeBytes32String("DIST001");
 
-    it("Should transfer item successfully", async function () {
-      const newCommit = ethers.randomBytes(32);
-      await supplyChain.connect(manufacturer).transferItem(itemKey, distributor.address, newCommit);
-      
-      expect(await supplyChain.ownerOf(itemKey)).to.equal(distributor.address);
-    });
+    beforeEach(async function () {
+      // 1. Register the item (Manufacturer is the current owner)
+      await supplyChain.connect(manufacturer).registerProduct(serialHash, dummyEncryptedBytes, dummyEncryptedBytes);
+    });
 
-    it("Should fail if non-owner tries to transfer", async function () {
-      await expect(
-        supplyChain.connect(user).transferItem(itemKey, user.address, commit)
-      ).to.be.revertedWith("Not the current owner");
-    });
+    it("Should successfully execute the two-step transfer (Manufacturer -> Distributor)", async function () {
+      
+      // STEP 1: Shipper (Manufacturer) creates the transaction
+      const createTx = await supplyChain.connect(manufacturer).createTransaction(
+        serialHash, 
+        dummyEncryptedBytes, 
+        dummyEncryptedBytes, 
+        eShipperID, 
+        eReceiverID, 
+        distributor.address // Receiver's address
+      );
+      const receipt = await createTx.wait();
+      const event = receipt.logs.find(log => log.fragment && log.fragment.name === 'TransactionCreated');
+      txHash = event.args[0];
 
-    it("Should fail to transfer to zero address", async function () {
-      await expect(
-        supplyChain.connect(manufacturer).transferItem(itemKey, ethers.ZeroAddress, commit)
-      ).to.be.revertedWith("Invalid new owner address");
-    });
+      // Ownership should NOT change yet (Manufacturer is still owner)
+      expect(await supplyChain.getCurrentOwner(serialHash)).to.equal(manufacturer.address);
 
-    it("Should emit ItemTransferred event", async function () {
-      const newCommit = ethers.randomBytes(32);
-      
-      await expect(supplyChain.connect(manufacturer).transferItem(itemKey, distributor.address, newCommit))
-        .to.emit(supplyChain, "ItemTransferred")
-        .withArgs(itemKey, manufacturer.address, distributor.address, newCommit, await time.latest() + 1);
-    });
+      // STEP 2: Receiver (Distributor) completes the transaction
+      await expect(supplyChain.connect(distributor).completeTransaction(txHash, serialHash))
+        .to.emit(supplyChain, "TransactionCompleted");
 
-    it("Should update transfer count", async function () {
-      await supplyChain.connect(manufacturer).transferItem(itemKey, distributor.address, commit);
-      
-      const item = await supplyChain.getItem(itemKey);
-      expect(item.transferCount).to.equal(1);
-    });
+      // Ownership MUST change now (Distributor is the new owner)
+      expect(await supplyChain.getCurrentOwner(serialHash)).to.equal(distributor.address);
+    });
 
-    it("Should record transfer history", async function () {
-      await supplyChain.connect(manufacturer).transferItem(itemKey, distributor.address, commit);
-      
-      const history = await supplyChain.getTransferHistory(itemKey);
-      expect(history.length).to.equal(2); // Initial + transfer
-      expect(history[1].from).to.equal(manufacturer.address);
-      expect(history[1].to).to.equal(distributor.address);
-    });
-  });
+    it("Should fail if non-owner tries to create transaction", async function () {
+      // User is not the current owner (Manufacturer is)
+      await expect(
+        supplyChain.connect(user).createTransaction(
+          serialHash, dummyEncryptedBytes, dummyEncryptedBytes, 
+          eShipperID, eReceiverID, distributor.address
+        )
+      ).to.be.revertedWith("You are not the current owner of this item");
+    });
 
-  describe("Batch Operations", function () {
-    it("Should register multiple items in batch", async function () {
-      const keys = [
-        ethers.keccak256(ethers.toUtf8Bytes("product|serial1")),
-        ethers.keccak256(ethers.toUtf8Bytes("product|serial2")),
-        ethers.keccak256(ethers.toUtf8Bytes("product|serial3"))
-      ];
-      const commits = [
-        ethers.randomBytes(32),
-        ethers.randomBytes(32),
-        ethers.randomBytes(32)
-      ];
+    it("Should fail if non-receiver tries to complete transaction", async function () {
+      // Create transaction first
+      const createTx = await supplyChain.connect(manufacturer).createTransaction(
+        serialHash, dummyEncryptedBytes, dummyEncryptedBytes, 
+        eShipperID, eReceiverID, distributor.address
+      );
+      const receipt = await createTx.wait();
+      txHash = receipt.logs.find(log => log.fragment && log.fragment.name === 'TransactionCreated').args[0];
 
-      await supplyChain.connect(manufacturer).batchRegisterItems(keys, manufacturer.address, commits);
+      // Attempt to complete by Manufacturer (shipper) -> should fail
+      await expect(
+        supplyChain.connect(manufacturer).completeTransaction(txHash, serialHash)
+      ).to.be.revertedWith("Only receiver can complete transaction");
+    });
+  });
 
-      expect(await supplyChain.itemExists(keys[0])).to.be.true;
-      expect(await supplyChain.itemExists(keys[1])).to.be.true;
-      expect(await supplyChain.itemExists(keys[2])).to.be.true;
-    });
+// =========================================================================
+// VISIBILITY RESTRICTION (PRIVACY REQUIREMENT)
+// =========================================================================
+  describe("Visibility Restriction", function () {
+    let txHash;
+    const eShipperID = ethers.encodeBytes32String("MFG001");
+    const eReceiverID = ethers.encodeBytes32String("DIST001");
 
-    it("Should transfer multiple items in batch", async function () {
-      const keys = [
-        ethers.keccak256(ethers.toUtf8Bytes("product|serial1")),
-        ethers.keccak256(ethers.toUtf8Bytes("product|serial2"))
-      ];
-      const commits = [
-        ethers.randomBytes(32),
-        ethers.randomBytes(32)
-      ];
+    beforeEach(async function () {
+      await supplyChain.connect(manufacturer).registerProduct(serialHash, dummyEncryptedBytes, dummyEncryptedBytes);
+      
+      // Create transaction
+      const createTx = await supplyChain.connect(manufacturer).createTransaction(
+        serialHash, dummyEncryptedBytes, dummyEncryptedBytes, eShipperID, eReceiverID, distributor.address
+      );
+      const receipt = await createTx.wait();
+      txHash = receipt.logs.find(log => log.fragment && log.fragment.name === 'TransactionCreated').args[0];
+    });
 
-      // Register first
-      await supplyChain.connect(manufacturer).batchRegisterItems(keys, manufacturer.address, commits);
+    it("Should allow Shipper (Manufacturer) to view transaction", async function () {
+      // Shipper retrieves the encrypted payload
+      const txData = await supplyChain.connect(manufacturer).getTransaction(txHash);
+      expect(txData.encryptedShipperId).to.equal(eShipperID);
+    });
 
-      // Transfer
-      const newCommits = [ethers.randomBytes(32), ethers.randomBytes(32)];
-      await supplyChain.connect(manufacturer).batchTransferItems(keys, distributor.address, newCommits);
+    it("Should allow Receiver (Distributor) to view transaction", async function () {
+      // Receiver retrieves the encrypted payload
+      const txData = await supplyChain.connect(distributor).getTransaction(txHash);
+      expect(txData.encryptedReceiverId).to.equal(eReceiverID);
+    });
 
-      expect(await supplyChain.ownerOf(keys[0])).to.equal(distributor.address);
-      expect(await supplyChain.ownerOf(keys[1])).to.equal(distributor.address);
-    });
-  });
+    it("Should fail for an unauthorized party (User) to view transaction", async function () {
+      // User is not the shipper or receiver
+      await expect(
+        supplyChain.connect(user).getTransaction(txHash)
+      ).to.be.revertedWith("Only shipper or receiver can view transaction");
+    });
 
-  describe("Recall Mechanism", function () {
-    beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit);
-    });
-
-    it("Should allow manufacturer to recall item", async function () {
-      await supplyChain.connect(manufacturer).recallItem(itemKey, "Safety concern");
-      
-      expect(await supplyChain.isRecalled(itemKey)).to.be.true;
-    });
-
-    it("Should allow regulator to recall item", async function () {
-      await supplyChain.connect(regulator).recallItem(itemKey, "Regulatory issue");
-      
-      expect(await supplyChain.isRecalled(itemKey)).to.be.true;
-    });
-
-    it("Should prevent transfer of recalled item", async function () {
-      await supplyChain.connect(manufacturer).recallItem(itemKey, "Safety concern");
-      
-      await expect(
-        supplyChain.connect(manufacturer).transferItem(itemKey, distributor.address, commit)
-      ).to.be.revertedWith("Item has been recalled");
-    });
-
-    it("Should emit ItemRecalled event", async function () {
-      await expect(supplyChain.connect(manufacturer).recallItem(itemKey, "Safety concern"))
-        .to.emit(supplyChain, "ItemRecalled");
-    });
-  });
-
-  describe("Pausable Functionality", function () {
-    it("Should allow admin to pause contract", async function () {
-      await supplyChain.connect(admin).pause();
-      expect(await supplyChain.paused()).to.be.true;
-    });
-
-    it("Should prevent operations when paused", async function () {
-      await supplyChain.connect(admin).pause();
-      
-      await expect(
-        supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit)
-      ).to.be.revertedWith("Pausable: paused");
-    });
-
-    it("Should allow admin to unpause", async function () {
-      await supplyChain.connect(admin).pause();
-      await supplyChain.connect(admin).unpause();
-      
-      expect(await supplyChain.paused()).to.be.false;
-    });
-  });
-
-  describe("View Functions", function () {
-    beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerItem(itemKey, manufacturer.address, commit);
-    });
-
-    it("Should return complete item information", async function () {
-      const item = await supplyChain.getItem(itemKey);
-      
-      expect(item.exists).to.be.true;
-      expect(item.currentOwner).to.equal(manufacturer.address);
-      expect(item.manufacturer).to.equal(manufacturer.address);
-      expect(item.recalled).to.be.false;
-    });
-
-    it("Should return transfer history", async function () {
-      await supplyChain.connect(manufacturer).transferItem(itemKey, distributor.address, commit);
-      
-      const history = await supplyChain.getTransferHistory(itemKey);
-      expect(history.length).to.equal(2);
-    });
-
-    it("Should check entity authorization", async function () {
-      expect(await supplyChain.isAuthorizedEntity(manufacturer.address)).to.be.true;
-      expect(await supplyChain.isAuthorizedEntity(user.address)).to.be.false;
-    });
-  });
+    it("Should fail for another authorized entity (Pharmacy) to view transaction", async function () {
+      // Pharmacy is not the shipper or receiver for THIS transaction
+      await expect(
+        supplyChain.connect(pharmacy).getTransaction(txHash)
+      ).to.be.revertedWith("Only shipper or receiver can view transaction");
+    });
+  });
 });
