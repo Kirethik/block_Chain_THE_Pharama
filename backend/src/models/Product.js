@@ -4,57 +4,54 @@ const { sequelize } = require("../config/db");
 class Product extends Model {}
 
 Product.init({
-  id: { 
-    type: DataTypes.BIGINT, 
-    primaryKey: true, 
-    autoIncrement: true 
-  },
   product_id: { 
-    type: DataTypes.STRING(128), 
-    allowNull: false,
-    unique: true,
-    comment: "Product identifier (GTIN)"
+    type: DataTypes.STRING(50),
+    primaryKey: true
   },
   product_name: {
     type: DataTypes.STRING(255),
     allowNull: false
   },
-  manufacturer: {
-    type: DataTypes.STRING(255),
+  gtin: {
+    type: DataTypes.STRING(14)
+  },
+  manufacturer_id: {  // ✅ foreign key to entities.entity_id
+    type: DataTypes.STRING(50),
     allowNull: false
   },
-  manufacturer_address: {
-    type: DataTypes.STRING(42),
-    allowNull: false,
-    comment: "Manufacturer's Ethereum address"
+  ndc: {
+    type: DataTypes.STRING(11)
   },
   description: {
     type: DataTypes.TEXT
   },
   category: {
-    type: DataTypes.STRING(100),
-    comment: "e.g., Vaccine, Antibiotic, Insulin"
+    type: DataTypes.STRING(100)
   },
-  requires_cold_chain: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+  dosage_form: {
+    type: DataTypes.STRING(100)
   },
-  expiry_period_days: {
-    type: DataTypes.INTEGER,
-    comment: "Days until expiration from manufacture date"
+  strength: {
+    type: DataTypes.STRING(100)
   },
-  regulatory_approvals: {
-    type: DataTypes.JSON,
-    comment: "FDA, EMA, etc. approval numbers"
+  unit_of_measure: {
+    type: DataTypes.STRING(50)
   },
-  active: {
+  is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  created_date: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  last_updated: {
+    type: DataTypes.DATE
   }
-}, { 
-  sequelize, 
-  tableName: "products", 
-  timestamps: true 
+}, {
+  sequelize,
+  tableName: "products",
+  timestamps: false // ✅ prevent Sequelize from expecting createdAt/updatedAt
 });
 
 module.exports = Product;

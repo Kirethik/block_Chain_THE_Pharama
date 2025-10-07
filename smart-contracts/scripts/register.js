@@ -4,51 +4,72 @@ const mysql = require("mysql2/promise");
 require("dotenv").config();
 
 async function main() {
-  const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-  const supplyChain = await ethers.getContractAt("PharmaceuticalSupplyChain", CONTRACT_ADDRESS);
+  const CONTRACT_ADDRESS =
+    process.env.SUPPLYCHAIN_ADDRESS ||
+    "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+  const supplyChain = await ethers.getContractAt(
+    "PharmaceuticalSupplyChain",
+    CONTRACT_ADDRESS
+  );
   const [admin, manufacturer] = await ethers.getSigners();
 
   console.log(`Admin: ${admin.address}`);
   console.log(`Manufacturer: ${manufacturer.address}`);
 
-  // Connect to MySQL
+  // ✅ Connect to MySQL
   const db = await mysql.createPool({
     host: process.env.DB_HOST || "localhost",
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASS || "",
-    database: process.env.DB_NAME || "pharma_supply_chain",
+    database: process.env.DB_NAME || "supplychain",
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
   });
 
-  // Authorize manufacturer (if not already)
-  const authorized = await supplyChain.authorizedManufacturers(manufacturer.address);
-  if (!authorized) {
-    const authTx = await supplyChain.connect(admin).authorizeManufacturer(manufacturer.address);
+  // ✅ Authorize manufacturer if not already
+  const isAuthorized = await supplyChain.authorizedManufacturers(
+    manufacturer.address
+  );
+
+  if (!isAuthorized) {
+    console.log("⏳ Authorizing manufacturer...");
+    const authTx = await supplyChain
+      .connect(admin)
+      .authorizeManufacturer(manufacturer.address);
     await authTx.wait();
-    console.log(`✅ Authorized manufacturer ${manufacturer.address}`);
+    console.log(`✅ Authorized manufacturer: ${manufacturer.address}`);
+  } else {
+    console.log(`✅ Manufacturer already authorized: ${manufacturer.address}`);
   }
 
-  // Prepare product data
-  const serialNumber = "LIPITOR-BATCH-001";
+  // ✅ Prepare data for product registration
+  const productId = "PROD001";
+  const manufacturerId = "MFG001";
+  const serialNumber = "LIPITOR-BATCH-0013";
   const serialHash = ethers.keccak256(ethers.toUtf8Bytes(serialNumber));
+  const now = new Date();
+
+  // These must be bytes32
   const encryptedProductId = ethers.encodeBytes32String("EncryptedLipitor1234");
-  const encryptedSerial = ethers.encodeBytes32String("EncryptedSerial1155151515");
+  const encryptedSerial = ethers.encodeBytes32String("EncryptedSerial11551515");
 
   console.log("⏳ Registering product on-chain...");
-  const tx = await supplyChain.connect(manufacturer).registerProduct(serialHash, encryptedProductId, encryptedSerial);
+
+  // ✅ Call contract with correct parameter types
+  const tx = await supplyChain
+    .connect(manufacturer)
+    .registerProduct(serialHash, encryptedProductId, encryptedSerial);
+
   const receipt = await tx.wait();
   const txHash = receipt.hash;
   const blockNumber = receipt.blockNumber;
+
   console.log(`✅ On-chain registration complete: ${txHash}`);
 
-  // Off-chain MySQL entry
+  // ✅ Off-chain MySQL sync
   const blockchainNetwork = "ETHEREUM_TESTNET";
-  const productId = "PROD001";
-  const manufacturerId = "MFG001";
-  const now = new Date();
-
   try {
     await db.execute(
       `INSERT INTO serialized_items 

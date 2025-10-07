@@ -3,52 +3,65 @@ const router = express.Router();
 const Entity = require('../models/Entity');
 const EthCrypto = require('eth-crypto');
 
+// ======================================
 // POST /api/entities - Register new entity
+// ======================================
 router.post('/', async (req, res) => {
   try {
     const {
-      ethereum_address,
+      blockchain_address, // ✅ use correct name
+      entity_id,          // ✅ your DB uses entity_id as PK
       entity_name,
       entity_type,
-      private_key,
       gln,
-      license_number,
-      contact_info
+      email,
+      phone,
+      address,
+      city,
+      state,
+      country,
+      postal_code
     } = req.body;
 
-    // Derive public key from private key if not provided
-    let public_key = req.body.public_key;
-    if (!public_key && private_key) {
-      public_key = EthCrypto.publicKeyByPrivateKey(private_key);
+    // Basic validation
+    if (!blockchain_address || !entity_id || !entity_name || !entity_type) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!public_key) {
-      return res.status(400).json({ 
-        error: 'Either public_key or private_key must be provided' 
-      });
+    // Check if entity already exists
+    const existing = await Entity.findOne({
+      where: { blockchain_address }
+    });
+    if (existing) {
+      return res.status(409).json({ error: 'Entity already registered' });
     }
 
+    // Create entity record
     const entity = await Entity.create({
-      ethereum_address,
+      entity_id,
       entity_name,
       entity_type,
-      public_key,
+      blockchain_address,
       gln,
-      license_number,
-      contact_info,
-      verified: false,
-      active: true
+      email,
+      phone,
+      address,
+      city,
+      state,
+      country,
+      postal_code,
+      is_active: true
     });
 
     res.status(201).json({
       success: true,
       message: 'Entity registered successfully',
       data: {
-        id: entity.id,
-        ethereum_address: entity.ethereum_address,
+        entity_id: entity.entity_id,
+        blockchain_address: entity.blockchain_address,
         entity_name: entity.entity_name,
         entity_type: entity.entity_type,
-        verified: entity.verified
+        is_active: entity.is_active
       }
     });
 
@@ -56,22 +69,24 @@ router.post('/', async (req, res) => {
     if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(409).json({ error: 'Entity already exists' });
     }
+    console.error('Entity creation error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
+// ======================================
 // GET /api/entities - List all entities
+// ======================================
 router.get('/', async (req, res) => {
   try {
-    const { entity_type, verified } = req.query;
+    const { entity_type, active } = req.query;
     
-    const where = { active: true };
+    const where = {};
     if (entity_type) where.entity_type = entity_type;
-    if (verified !== undefined) where.verified = verified === 'true';
+    if (active !== undefined) where.is_active = active === 'true';
 
     const entities = await Entity.findAll({
-      where,
-      attributes: { exclude: ['private_key'] }
+      where
     });
 
     res.json({
@@ -81,16 +96,18 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Fetch entities error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// GET /api/entities/:address - Get specific entity
+// ======================================
+// GET /api/entities/:address - Get one entity
+// ======================================
 router.get('/:address', async (req, res) => {
   try {
     const entity = await Entity.findOne({
-      where: { ethereum_address: req.params.address },
-      attributes: { exclude: ['private_key'] }
+      where: { blockchain_address: req.params.address }
     });
 
     if (!entity) {
@@ -103,15 +120,18 @@ router.get('/:address', async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Fetch entity error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// PUT /api/entities/:address/verify - Verify an entity (admin only)
+// ======================================
+// PUT /api/entities/:address/verify - Verify entity
+// ======================================
 router.put('/:address/verify', async (req, res) => {
   try {
     const entity = await Entity.findOne({
-      where: { ethereum_address: req.params.address }
+      where: { blockchain_address: req.params.address } // ✅ fixed here too
     });
 
     if (!entity) {
@@ -128,6 +148,7 @@ router.put('/:address/verify', async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Verify entity error:', error);
     res.status(500).json({ error: error.message });
   }
 });

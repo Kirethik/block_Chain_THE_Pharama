@@ -4,51 +4,72 @@ const { sequelize } = require("../config/db");
 class Entity extends Model {}
 
 Entity.init({
-  id: { 
-    type: DataTypes.BIGINT, 
-    primaryKey: true, 
-    autoIncrement: true 
-  },
-  ethereum_address: {
-    type: DataTypes.STRING(42),
+  entity_id: { // ✅ Primary key matches DB exactly
+    type: DataTypes.STRING(50),
     allowNull: false,
-    unique: true
+    primaryKey: true
   },
   entity_name: {
     type: DataTypes.STRING(255),
     allowNull: false
   },
   entity_type: {
-    type: DataTypes.ENUM('manufacturer', 'distributor', 'pharmacy', 'hospital', 'regulator'),
+    type: DataTypes.ENUM('MANUFACTURER', 'DISTRIBUTOR', 'DISPENSER', 'HOSPITAL', 'PHARMACY'),
     allowNull: false
   },
+  blockchain_address: { // ✅ Matches DB column
+    type: DataTypes.STRING(42),
+    allowNull: false,
+    unique: true
+  },
+  
+  // 🆕 Add this field to match the 'public_key' column used in encryption
   public_key: {
     type: DataTypes.TEXT,
-    allowNull: false,
-    comment: "Uncompressed public key for encryption"
+    allowNull: true,
+    comment: "Uncompressed Ethereum public key (starts with 04)"
   },
+
   gln: {
-    type: DataTypes.STRING(13),
-    comment: "Global Location Number (GS1 standard)"
+    type: DataTypes.STRING(13)
   },
-  license_number: {
+  email: {
+    type: DataTypes.STRING(255)
+  },
+  phone: {
+    type: DataTypes.STRING(20)
+  },
+  address: {
+    type: DataTypes.TEXT
+  },
+  city: {
     type: DataTypes.STRING(100)
   },
-  contact_info: {
-    type: DataTypes.JSON
+  state: {
+    type: DataTypes.STRING(100)
   },
-  verified: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+  country: {
+    type: DataTypes.STRING(100)
   },
-  active: {
+  postal_code: {
+    type: DataTypes.STRING(20)
+  },
+  is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  registration_date: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  last_updated: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
   }
-}, { 
-  sequelize, 
-  tableName: "entities", 
-  timestamps: true 
+}, {
+  sequelize,
+  tableName: "entities",
+  timestamps: false // ✅ because registration_date & last_updated exist
 });
 
 module.exports = Entity;

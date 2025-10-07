@@ -41,4 +41,13 @@ async function startServer() {
   }
 }
 
+
+// Global error handlers for robust server
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception thrown:', err);
+});
+
 startServer();

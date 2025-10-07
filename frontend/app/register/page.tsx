@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ethers } from 'ethers';
 import { Package, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+// MetaMask type declaration
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 export default function RegisterItem() {
   const [formData, setFormData] = useState({
@@ -23,22 +31,119 @@ export default function RegisterItem() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
 
+  // 🧠 Ensure MetaMask is connected to Hardhat Localhost
+  const ensureCorrectNetwork = async () => {
+    if (!window.ethereum) throw new Error("MetaMask not installed");
+
+    const requiredChainId = "0x7A69"; // 31337 in hex (Hardhat default)
+    const currentChainId = await window.ethereum.request({ method: "eth_chainId" });
+
+    if (currentChainId !== requiredChainId) {
+      try {
+        // Try switching to Hardhat
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: requiredChainId }],
+        });
+        console.log("✅ Switched to Hardhat Localhost");
+      } catch (error: any) {
+        // If not added, add it
+        if (error.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: requiredChainId,
+                chainName: "Hardhat Localhost",
+                rpcUrls: ["http://127.0.0.1:8545"],
+                nativeCurrency: {
+                  name: "Ethereum",
+                  symbol: "ETH",
+                  decimals: 18,
+                },
+              },
+            ],
+          });
+        } else {
+          throw error;
+        }
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setResult(null);
 
-    setTimeout(() => {
-      const mockResult = {
-        blockchainTxHash: '0x' + Math.random().toString(16).substring(2, 18),
-        blockNumber: Math.floor(Math.random() * 1000000) + 1000000,
-        keyHash: '0x' + Math.random().toString(16).substring(2, 18),
-        status: 'success'
+    try {
+      // ✅ Ensure correct network first
+      await ensureCorrectNetwork();
+
+      // 1️⃣ Connect to MetaMask
+      if (!window.ethereum) throw new Error('MetaMask is not installed');
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const ownerAddress = await signer.getAddress();
+
+      // 2️⃣ Contract Setup (your deployed address)
+      const contractAddress =
+        process.env.NEXT_PUBLIC_SUPPLYCHAIN_ADDRESS ||
+        '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // Default local Hardhat address
+
+      const contractABI = [
+        'function registerProduct(bytes32 _serialNumberHash, bytes32 _encryptedProductId, bytes32 _encryptedSerialNumber) external',
+      ];
+
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+      // 3️⃣ Prepare Data for Blockchain
+      const serialNumber = formData.serialNumber;
+      const serialHash = ethers.keccak256(ethers.toUtf8Bytes(serialNumber));
+      const encryptedProductId = ethers.encodeBytes32String('Encrypted' + formData.productId);
+      const encryptedSerial = ethers.encodeBytes32String('Encrypted' + serialNumber);
+
+      console.log('⏳ Registering product on blockchain...');
+      const tx = await contract.registerProduct(serialHash, encryptedProductId, encryptedSerial);
+      const receipt = await tx.wait();
+
+      console.log('✅ On-chain registration complete:', receipt.hash);
+
+      // 4️⃣ Sync to backend MySQL
+      const payload = {
+        productId: formData.productId,
+        serialNumber: formData.serialNumber,
+        batchNumber: formData.batchNumber,
+        ownerAddress,
+        transactionData: {
+          location: formData.location,
+          temperature: formData.temperature,
+          notes: formData.notes
+        },
+        metadata: {},
+        blockchainTxHash: receipt.hash,
+        blockNumber: receipt.blockNumber
       };
 
-      setResult(mockResult);
-      setLoading(false);
+      const res = await fetch('http://localhost:4000/api/transactions/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const responseData = await res.json();
+      if (!res.ok) throw new Error(responseData.error || 'Failed to register in backend');
+
+      // 5️⃣ Show Result
+      setResult({
+        blockchainTxHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        keyHash: ethers.keccak256(
+          ethers.toUtf8Bytes(`${formData.productId}|${formData.serialNumber}`)
+        ),
+      });
 
       setFormData({
         productId: '',
@@ -48,7 +153,12 @@ export default function RegisterItem() {
         temperature: '',
         notes: ''
       });
-    }, 2000);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,9 +173,9 @@ export default function RegisterItem() {
           <CheckCircle className="h-5 w-5 text-green-600" />
           <AlertDescription className="ml-2">
             <div className="space-y-1">
-              <p className="font-semibold text-green-900">Item Registered Successfully!</p>
-              <p className="text-sm text-green-700">Transaction Hash: {result.blockchainTxHash}</p>
-              <p className="text-sm text-green-700">Block Number: {result.blockNumber}</p>
+              <p className="font-semibold text-green-900">✅ Item Registered Successfully!</p>
+              <p className="text-sm text-green-700">Tx Hash: {result.blockchainTxHash}</p>
+              <p className="text-sm text-green-700">Block: {result.blockNumber}</p>
               <p className="text-sm text-green-700">Key Hash: {result.keyHash}</p>
             </div>
           </AlertDescription>
@@ -87,12 +197,12 @@ export default function RegisterItem() {
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="productId">Product ID (GTIN) *</Label>
+                <Label htmlFor="productId">Product ID *</Label>
                 <Input
                   id="productId"
                   value={formData.productId}
-                  onChange={(e) => setFormData({...formData, productId: e.target.value})}
-                  placeholder="00300001234567"
+                  onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
+                  placeholder="PROD001"
                   required
                 />
               </div>
@@ -102,8 +212,8 @@ export default function RegisterItem() {
                 <Input
                   id="serialNumber"
                   value={formData.serialNumber}
-                  onChange={(e) => setFormData({...formData, serialNumber: e.target.value})}
-                  placeholder="SN-2024-001"
+                  onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                  placeholder="LIPITOR-BATCH-002"
                   required
                 />
               </div>
@@ -113,8 +223,8 @@ export default function RegisterItem() {
                 <Input
                   id="batchNumber"
                   value={formData.batchNumber}
-                  onChange={(e) => setFormData({...formData, batchNumber: e.target.value})}
-                  placeholder="BATCH-2024-001"
+                  onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
+                  placeholder="BATCH-002"
                   required
                 />
               </div>
@@ -124,8 +234,8 @@ export default function RegisterItem() {
                 <Input
                   id="location"
                   value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
-                  placeholder="Manufacturing Plant A"
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="Plant A"
                   required
                 />
               </div>
@@ -136,8 +246,8 @@ export default function RegisterItem() {
                   id="temperature"
                   type="number"
                   value={formData.temperature}
-                  onChange={(e) => setFormData({...formData, temperature: e.target.value})}
-                  placeholder="-70"
+                  onChange={(e) => setFormData({ ...formData, temperature: e.target.value })}
+                  placeholder="25"
                 />
               </div>
             </div>
@@ -147,67 +257,30 @@ export default function RegisterItem() {
               <Textarea
                 id="notes"
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                placeholder="Additional information..."
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional info..."
                 rows={3}
               />
             </div>
 
             <div className="mt-6 flex space-x-4">
               <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? (
-                  'Registering...'
-                ) : (
-                  <>
-                    <Package className="h-5 w-5 mr-2" />
-                    Register Item
-                  </>
-                )}
+                {loading ? 'Registering...' : (<><Package className="h-5 w-5 mr-2" /> Register Item</>)}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setFormData({
-                  productId: '',
-                  serialNumber: '',
-                  batchNumber: '',
-                  location: '',
-                  temperature: '',
-                  notes: ''
-                })}
+                onClick={() =>
+                  setFormData({ productId: '', serialNumber: '', batchNumber: '', location: '', temperature: '', notes: '' })
+                }
               >
-                Clear Form
+                Clear
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Registration Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 text-sm text-gray-600">
-            <p className="flex items-start">
-              <span className="text-blue-600 mr-2">•</span>
-              <span>Only manufacturers can register new items on the blockchain</span>
-            </p>
-            <p className="flex items-start">
-              <span className="text-blue-600 mr-2">•</span>
-              <span>All data is encrypted with AES-256-GCM before storage</span>
-            </p>
-            <p className="flex items-start">
-              <span className="text-blue-600 mr-2">•</span>
-              <span>Transaction uses Polygon PoS consensus algorithm</span>
-            </p>
-            <p className="flex items-start">
-              <span className="text-blue-600 mr-2">•</span>
-              <span>Confirmation time: ~20 seconds</span>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
+// Notes:

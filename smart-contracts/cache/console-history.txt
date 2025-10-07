@@ -1,34 +1,4 @@
-await supplyChain.getCurrentOwner(serialHash);
-await supplyChain.isRegistered(serialHash);
-const serialHash = ethers.keccak256(ethers.toUtf8Bytes(serialNumber));
-const serialNumber = "LIPITOR-BATCH-001";
-const supplyChain = await ethers.getContractAt("PharmaceuticalSupplyChain", contractAddress);
-await supplyChain.isRegistered(serialHash);
-const serialHash = ethers.keccak256(ethers.toUtf8Bytes(serialNumber));
-const serialNumber = "LIPITOR-BATCH-001";
-;
-);
-const supplyChain = await ethers.getContractAt("Ph
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-await supplyChain.isRegistered(serialHash);
-const serialHash = ethers.keccak256(ethers.
-const serialNumber = "LIPITOR-BATCH-001";
-const supplyChain = await ethers.getContractAt("PharmaceuticalSupplyChain", contractAddress);
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-egistered(serialHash);
-await supplyChain.isR
-const serialHash = ethers.keccak256(ethers.toUtf8Bytes(serialNumber));
-const serialNumber = "LIPITOR-BATCH
-const supplyChain = await ethers
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-await supplyChain.isRegistered(serialHash);
-const serialHash = ethers.keccak256(ethers.
-const serialNumber = "LIPITOR-BATCH-001";
-const supplyChain = await ethers
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-;
-await supplyChain.isRegistered(serialHash);
-const serialHash = ethers.keccak256(ethers.toUtf8Bytes(serialNumber));
-const serialNumber = "LIPITOR-BATCH-001";
-const supplyChain = await ethers.getContractAt("Ph
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+await ethers.provider.getCode("0x5FbDB2315678afecb367f032d93F642f64180aa3")
+\
+await ethers.provider.getCode("0x5FbDB2315678afecb
+> await ethers.provider.getCode("0x5FbDB2315678af

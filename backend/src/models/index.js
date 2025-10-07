@@ -7,11 +7,21 @@ const Entity = require("./Entity");
 Transaction.belongsTo(Product, { foreignKey: 'product_id', targetKey: 'product_id' });
 Product.hasMany(Transaction, { foreignKey: 'product_id', sourceKey: 'product_id' });
 
-// Sync all models
+// Transactions linked to entities
+Transaction.belongsTo(Entity, { as: 'shipper', foreignKey: 'shipper_id' });
+Transaction.belongsTo(Entity, { as: 'receiver', foreignKey: 'receiver_id' });
+
+Entity.hasMany(Transaction, { as: 'ShippedTransactions', foreignKey: 'shipper_id' });
+Entity.hasMany(Transaction, { as: 'ReceivedTransactions', foreignKey: 'receiver_id' });
+
+// Safe sync function
 async function syncModels() {
   try {
-    await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
-    console.log('✓ All models synchronized');
+    await sequelize.authenticate();
+    console.log('✓ Database connection established successfully.');
+
+    await sequelize.sync({ alter: false });
+    console.log('✓ All models synchronized (no forced recreation)');
   } catch (error) {
     console.error('✗ Model sync error:', error);
     throw error;

@@ -7,8 +7,8 @@ const { sequelize, syncModels } = require("./models");
 require("dotenv").config();
 
 const txRoutes = require("./routes/transactions");
-const productRoutes = require("./routes/products");
-const entityRoutes = require("./routes/entities");
+const productRoutes = require("./routes/product");
+const entityRoutes = require("./routes/entites");
 const healthRoutes = require("./routes/health");
 
 const app = express();
@@ -16,7 +16,7 @@ const app = express();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: ["http://localhost:3000", process.env.CORS_ORIGIN || '*'],
   credentials: true
 }));
 
